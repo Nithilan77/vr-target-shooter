@@ -4,7 +4,7 @@ A WebXR-powered virtual reality target shooting game optimized for Meta Quest 3 
 
 ## 🚀 Play Live
 
-**🎮 [Play VR Target Shooter](https://yourusername.github.io/vr-target-shooter/fixed-vr-game.html)**
+**🎮 [Play VR Target Shooter](https://nithilan77.github.io/vr-target-shooter/fixed-vr-game.html)**
 
 ## ✨ Features
 
