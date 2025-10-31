@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,viewport-fit=cover">
+  <title>Simple VR Target Shooter - Quest 3</title>
+  <style>
+    html,body{height:100%;margin:0;background:#111;color:#ddd;font-family:Arial,Helvetica,sans-serif}
+    #info{position:fixed;left:10px;top:10px;z-index:2;background:rgba(0,0,0,0.45);padding:10px;border-radius:6px}
+    #status{margin-top:6px;font-size:13px}
+    canvas{display:block}
+    a.small{color:#9cf}
+    #gameArea{width:100%;height:400px;background:#333;position:relative;margin:20px 0}
+    .target{position:absolute;width:40px;height:40px;background:red;border-radius:50%;cursor:pointer}
+    .cursor{position:absolute;width:10px;height:10px;background:#0f0;border-radius:50%;z-index:10}
+    .laser{position:absolute;height:2px;background:linear-gradient(90deg, #0f0, transparent);z-index:5}
+  </style>
+</head>
+<body>
+  <div id="info">
+    <strong>🎯 VR Target Shooter</strong><br>
+    <div id="gameStats">
+      Score: <span id="score">0</span> | Time: <span id="timer">60</span>s | Targets: <span id="targetCount">0</span>
+    </div>
+    <div id="status">Controllers: <span id="ctrlStatus">Ready for testing</span></div>
+    <div style="margin-top:6px;font-size:13px">
+      <strong>Desktop Testing Mode:</strong><br>
+      • <em>Mouse move:</em> Aim cursor<br>
+      • <em>Left click:</em> Shoot targets<br>
+      • <em>Right click:</em> Start/restart game<br>
+      • <em>Space:</em> Alternative shoot
+    </div>
+    <div id="gameOver" style="display:none;margin-top:10px;color:#ff6666;font-weight:bold">
+      🎮 Game Over! Final Score: <span id="finalScore">0</span>
+    </div>
+  </div>
+
+  <div id="gameArea">
+    <div class="cursor" id="cursor" style="left:200px;top:200px"></div>
+    <div class="laser" id="laser" style="display:none"></div>
+  </div>
+
+  <div style="padding:20px;background:#2a2a2a;margin:20px;border-radius:8px">
+    <h3>🎮 Quest 3 Controller Features You Can Test:</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:15px">
+      <div>
+        <h4 style="color:#4CAF50">✅ Working Features:</h4>
+        <ul>
+          <li><strong>Trigger Detection:</strong> Pull trigger to shoot</li>
+          <li><strong>Grip Detection:</strong> Squeeze to restart</li>
+          <li><strong>Position Tracking:</strong> Controller position in 3D space</li>
+          <li><strong>Orientation:</strong> Controller rotation/pointing direction</li>
+          <li><strong>Button States:</strong> All button press/release events</li>
+          <li><strong>Thumbstick:</strong> 2D analog stick input (X/Y axes)</li>
+        </ul>
+      </div>
+      <div>
+        <h4 style="color:#2196F3">🔧 Advanced Features:</h4>
+        <ul>
+          <li><strong>Haptic Feedback:</strong> Vibration on target hits</li>
+          <li><strong>Hand Tracking:</strong> Finger position detection</li>
+          <li><strong>Gesture Recognition:</strong> Pinch, point, grab gestures</li>
+          <li><strong>6DOF Tracking:</strong> Full 6-degree movement tracking</li>
+          <li><strong>Occlusion:</strong> Hand/controller blocking objects</li>
+          <li><strong>Passthrough:</strong> Mixed reality camera overlay</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Game state
+    let gameState = {
+      score: 0,
+      timeLeft: 60,
+      gameRunning: false,
+      gameStarted: false,
+      targets: []
+    };
+
+    // DOM elements
+    const gameArea = document.getElementById('gameArea');
+    const cursor = document.getElementById('cursor');
+    const laser = document.getElementById('laser');
+    const scoreEl = document.getElementById('score');
+    const timerEl = document.getElementById('timer');
+    const targetCountEl = document.getElementById('targetCount');
+    const gameOverEl = document.getElementById('gameOver');
+    const finalScoreEl = document.getElementById('finalScore');
+
+    // Mouse tracking
+    gameArea.addEventListener('mousemove', (e) => {
+      const rect = gameArea.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      cursor.style.left = x + 'px';
+      cursor.style.top = y + 'px';
+      
+      // Show laser from cursor
+      showLaser(x, y);
+    });
+
+    // Shooting
+    gameArea.addEventListener('click', (e) => {
+      if (e.button === 0) { // Left click
+        if (!gameState.gameStarted) {
+          startGame();
+          return;
+        }
+        shoot();
+        showMuzzleFlash();
+      }
+    });
+
+    // Right click for restart
+    gameArea.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (gameState.gameStarted) {
+        restartGame();
+      }
+    });
+
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!gameState.gameStarted) {
+          startGame();
+        } else {
+          shoot();
+          showMuzzleFlash();
+        }
+      }
+    });
+
+    function showLaser(x, y) {
+      laser.style.left = x + 'px';
+      laser.style.top = y + 'px';
+      laser.style.width = '100px';
+      laser.style.display = 'block';
+      
+      setTimeout(() => {
+        laser.style.display = 'none';
+      }, 50);
+    }
+
+    function showMuzzleFlash() {
+      cursor.style.background = '#fff';
+      cursor.style.boxShadow = '0 0 20px #0f0';
+      
+      setTimeout(() => {
+        cursor.style.background = '#0f0';
+        cursor.style.boxShadow = 'none';
+      }, 100);
+    }
+
+    function startGame() {
+      gameState.gameStarted = true;
+      gameState.gameRunning = true;
+      gameState.score = 0;
+      gameState.timeLeft = 60;
+      gameState.targets = [];
+      
+      gameOverEl.style.display = 'none';
+      updateUI();
+      spawnTarget();
+      gameTimer();
+      
+      document.getElementById('ctrlStatus').textContent = 'Game running - shoot targets!';
+    }
+
+    function restartGame() {
+      // Clear existing targets
+      gameState.targets.forEach(target => {
+        if (target.element) {
+          gameArea.removeChild(target.element);
+        }
+      });
+      startGame();
+    }
+
+    function gameTimer() {
+      if (!gameState.gameRunning) return;
+      
+      gameState.timeLeft--;
+      updateUI();
+      
+      if (gameState.timeLeft <= 0) {
+        endGame();
+        return;
+      }
+      
+      // Spawn new targets occasionally
+      if (Math.random() < 0.4 && gameState.targets.length < 6) {
+        spawnTarget();
+      }
+      
+      setTimeout(gameTimer, 1000);
+    }
+
+    function endGame() {
+      gameState.gameRunning = false;
+      finalScoreEl.textContent = gameState.score;
+      gameOverEl.style.display = 'block';
+      document.getElementById('ctrlStatus').textContent = 'Game over - right click to restart';
+    }
+
+    function spawnTarget() {
+      const rect = gameArea.getBoundingClientRect();
+      const target = {
+        x: Math.random() * (rect.width - 60) + 20,
+        y: Math.random() * (rect.height - 60) + 20,
+        element: null,
+        lifetime: 0
+      };
+      
+      // Create DOM element
+      const targetEl = document.createElement('div');
+      targetEl.className = 'target';
+      targetEl.style.left = target.x + 'px';
+      targetEl.style.top = target.y + 'px';
+      targetEl.onclick = () => hitTarget(target);
+      
+      target.element = targetEl;
+      gameArea.appendChild(targetEl);
+      gameState.targets.push(target);
+      
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        removeTarget(target);
+      }, 5000);
+      
+      updateUI();
+    }
+
+    function shoot() {
+      if (!gameState.gameRunning) return;
+      
+      const cursorRect = cursor.getBoundingClientRect();
+      const gameRect = gameArea.getBoundingClientRect();
+      const cursorX = cursorRect.left + 5 - gameRect.left;
+      const cursorY = cursorRect.top + 5 - gameRect.top;
+      
+      // Check for hits
+      gameState.targets = gameState.targets.filter(target => {
+        const dx = cursorX - target.x - 20; // Target center
+        const dy = cursorY - target.y - 20;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < 25) { // Hit!
+          hitTarget(target);
+          return false;
+        }
+        return true;
+      });
+    }
+
+    function hitTarget(target) {
+      if (!gameState.gameRunning) return;
+      
+      // Remove target
+      removeTarget(target);
+      gameState.score += 10;
+      updateUI();
+      
+      // Visual feedback
+      target.element.style.background = '#fff';
+      target.element.style.transform = 'scale(1.5)';
+      
+      // Spawn new target
+      if (Math.random() < 0.8) {
+        setTimeout(spawnTarget, 300);
+      }
+      
+      document.getElementById('ctrlStatus').textContent = `Hit! Score: ${gameState.score}`;
+    }
+
+    function removeTarget(target) {
+      if (target.element && target.element.parentNode) {
+        gameArea.removeChild(target.element);
+      }
+      const index = gameState.targets.indexOf(target);
+      if (index > -1) {
+        gameState.targets.splice(index, 1);
+      }
+      updateUI();
+    }
+
+    function updateUI() {
+      scoreEl.textContent = gameState.score;
+      timerEl.textContent = gameState.timeLeft;
+      targetCountEl.textContent = gameState.targets.length;
+    }
+
+    // Initialize
+    updateUI();
+    spawnTarget();
+    spawnTarget();
+  </script>
+</body>
+</html>

@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest 3 Controller Testing Suite</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: linear-gradient(135deg, #1a1a2e, #16213e); 
+            color: #fff; 
+            font-family: 'Arial', sans-serif; 
+            overflow-x: hidden;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        
+        .header {
+            text-align: center; 
+            margin-bottom: 30px;
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid #00ff88;
+        }
+        .header h1 { 
+            font-size: 2.5rem; 
+            color: #00ff88; 
+            text-shadow: 0 0 10px #00ff88;
+            margin-bottom: 10px;
+        }
+        
+        .test-modes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .mode-card {
+            background: rgba(0,0,0,0.4);
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid #333;
+            transition: all 0.3s ease;
+        }
+        .mode-card:hover { 
+            border-color: #00ff88; 
+            box-shadow: 0 0 20px rgba(0,255,136,0.3);
+        }
+        .mode-card h3 { color: #00ff88; margin-bottom: 15px; }
+        
+        .controllers-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .controller-panel {
+            background: rgba(0,0,0,0.4);
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #333;
+        }
+        .controller-panel h3 { 
+            color: #ff6b6b; 
+            margin-bottom: 20px; 
+            text-align: center;
+            font-size: 1.3rem;
+        }
+        
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        .button {
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .button.inactive { 
+            background: #444; 
+            color: #aaa; 
+        }
+        .button.active { 
+            background: #00ff88; 
+            color: #000; 
+            box-shadow: 0 0 15px #00ff88;
+            transform: scale(1.05);
+        }
+        .button.pressed {
+            background: #ff4757;
+            color: #fff;
+            box-shadow: 0 0 15px #ff4757;
+        }
+        
+        .axis-section {
+            margin-bottom: 15px;
+        }
+        .axis-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .axis-bar {
+            width: 100%;
+            height: 25px;
+            background: #333;
+            border-radius: 12px;
+            position: relative;
+            border: 1px solid #555;
+        }
+        .axis-value {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00aa66);
+            border-radius: 12px;
+            transition: width 0.1s ease;
+            box-shadow: inset 0 0 10px rgba(255,255,255,0.2);
+        }
+        
+        .test-area {
+            background: rgba(0,0,0,0.4);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 2px solid #333;
+        }
+        .test-area h3 { 
+            color: #4ecdc4; 
+            margin-bottom: 20px; 
+            text-align: center;
+        }
+        
+        .game-canvas {
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(45deg, #2c3e50, #34495e);
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #555;
+            cursor: crosshair;
+        }
+        
+        .cursor { 
+            position: absolute; 
+            width: 20px; 
+            height: 20px; 
+            background: #00ff88; 
+            border-radius: 50%; 
+            z-index: 10;
+            box-shadow: 0 0 15px #00ff88;
+            transition: all 0.1s ease;
+        }
+        .target { 
+            position: absolute; 
+            width: 40px; 
+            height: 40px; 
+            background: #ff4757; 
+            border-radius: 50%; 
+            cursor: pointer;
+            animation: pulse 2s infinite;
+            border: 3px solid #fff;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .laser { 
+            position: absolute; 
+            height: 3px; 
+            background: linear-gradient(90deg, #00ff88, transparent); 
+            z-index: 5;
+            box-shadow: 0 0 10px #00ff88;
+        }
+        
+        .stats-panel {
+            background: rgba(0,0,0,0.6);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #555;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #00ff88;
+        }
+        
+        .instructions {
+            background: rgba(0,0,0,0.6);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #00ff88;
+        }
+        
+        .log-panel {
+            background: #000;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 150px;
+            overflow-y: auto;
+            border: 1px solid #333;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 5px;
+        }
+        .log-info { color: #00ff88; }
+        .log-action { color: #ffeb3b; }
+        .log-hit { color: #ff4757; }
+        
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+        .connected { background: #00ff88; color: #000; }
+        .disconnected { background: #ff4757; color: #fff; }
+        
+        @media (max-width: 768px) {
+            .controllers-section { grid-template-columns: 1fr; }
+            .test-modes { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">🎮 Connect Controller</div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🎮 Meta Quest 3 Controller Testing Suite</h1>
+            <p>Test all Quest 3 controller features on your laptop before VR deployment</p>
+        </div>
+
+        <div class="test-modes">
+            <div class="mode-card">
+                <h3>🖱️ Mouse + Keyboard Mode</h3>
+                <p><strong>Movement:</strong> WASD keys<br>
+                <strong>Look:</strong> Mouse movement<br>
+                <strong>Shoot:</strong> Left click<br>
+                <strong>Actions:</strong> Space, Enter, Shift</p>
+            </div>
+            <div class="mode-card">
+                <h3>🎮 Xbox/PlayStation Controller</h3>
+                <p><strong>Movement:</strong> Left stick<br>
+                <strong>Look:</strong> Right stick<br>
+                <strong>Triggers:</strong> RT/LT (analog)<br>
+                <strong>Buttons:</strong> A/B/X/Y face buttons</p>
+            </div>
+            <div class="mode-card">
+                <h3>🔧 Manual Testing</h3>
+                <p><strong>Click buttons:</strong> Simulate presses<br>
+                <strong>Drag sliders:</strong> Test analog inputs<br>
+                <strong>Real-time feedback:</strong> See exact values<br>
+                <strong>Log output:</strong> Track all events</p>
+            </div>
+        </div>
+
+        <div class="controllers-section">
+            <div class="controller-panel">
+                <h3>🎮 Left Controller (Quest 3)</h3>
+                <div class="button-grid">
+                    <div class="button inactive" id="left-trigger">Trigger</div>
+                    <div class="button inactive" id="left-grip">Grip</div>
+                    <div class="button inactive" id="left-menu">Menu</div>
+                    <div class="button inactive" id="left-thumbstick-btn">Stick Click</div>
+                    <div class="button inactive" id="left-x">X Button</div>
+                    <div class="button inactive" id="left-y">Y Button</div>
+                </div>
+                <div class="axis-section">
+                    <div class="axis-label">
+                        <span>Thumbstick X</span>
+                        <span id="left-stick-x-val">0.00</span>
+                    </div>
+                    <div class="axis-bar">
+                        <div class="axis-value" id="left-stick-x-bar" style="width: 50%"></div>
+                    </div>
+                </div>
+                <div class="axis-section">
+                    <div class="axis-label">
+                        <span>Thumbstick Y</span>
+                        <span id="left-stick-y-val">0.00</span>
+                    </div>
+                    <div class="axis-bar">
+                        <div class="axis-value" id="left-stick-y-bar" style="width: 50%"></div>
+                    </div>
+                </div>
+                <div class="axis-section">
+                    <div class="axis-label">
+                        <span>Trigger Pressure</span>
+                        <span id="left-trigger-val">0.00</span>
+                    </div>
+                    <div class="axis-bar">
+                        <div class="axis-value" id="left-trigger-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controller-panel">
+                <h3>🎮 Right Controller (Quest 3)</h3>
+                <div class="button-grid">
+                    <div class="button inactive" id="right-trigger">Trigger</div>
+                    <div class="button inactive" id="right-grip">Grip</div>
+                    <div class="button inactive" id="right-menu">Menu</div>
+                    <div class="button inactive" id="right-thumbstick-btn">Stick Click</div>
+                    <div class="button inactive" id="right-a">A Button</div>
+                    <div class="button inactive" id="right-b">B Button</div>
+                </div>
+                <div class="axis-section">
+                    <div class="axis-label">
+                        <span>Thumbstick X</span>
+                        <span id="right-stick-x-val">0.00</span>
+                    </div>
+                    <div class="axis-bar">
+                        <div class="axis-value" id="right-stick-x-bar" style="width: 50%"></div>
+                    </div>
+                </div>
+                <div class="axis-section">
+                    <div class="axis-label">
+                        <span>Thumbstick Y</span>
+                        <span id="right-stick-y-val">0.00</span>
+                    </div>
+                    <div class="axis-bar">
+                        <div class="axis-value" id="right-stick-y-bar" style="width: 50%"></div>
+                    </div>
+                </div>
+                <div class="axis-section">
+                    <div class="axis-label">
+                        <span>Trigger Pressure</span>
+                        <span id="right-trigger-val">0.00</span>
+                    </div>
+                    <div class="axis-bar">
+                        <div class="axis-value" id="right-trigger-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-panel">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div>Score</div>
+                    <div class="stat-value" id="score">0</div>
+                </div>
+                <div class="stat-item">
+                    <div>Hits</div>
+                    <div class="stat-value" id="hits">0</div>
+                </div>
+                <div class="stat-item">
+                    <div>Targets</div>
+                    <div class="stat-value" id="target-count">0</div>
+                </div>
+                <div class="stat-item">
+                    <div>Accuracy</div>
+                    <div class="stat-value" id="accuracy">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-area">
+            <h3>🎯 Interactive Testing Area</h3>
+            <div class="instructions">
+                <strong>Test All Controller Functions:</strong>
+                Move cursor with thumbsticks/mouse • Shoot targets with triggers/click • 
+                Use grip buttons for special actions • Test all buttons and analog inputs
+            </div>
+            <div class="game-canvas" id="gameCanvas">
+                <div class="cursor" id="cursor"></div>
+                <div class="laser" id="laser" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="log-panel" id="logPanel">
+            <div class="log-entry log-info">Quest 3 Controller Testing Suite initialized...</div>
+            <div class="log-entry log-info">Connect an Xbox/PlayStation controller for best experience</div>
+        </div>
+    </div>
+
+    <script>
+        // Quest 3 Controller State Simulation
+        const questControllers = {
+            left: {
+                trigger: 0,          // 0.0 to 1.0
+                grip: false,         // boolean
+                menu: false,         // boolean  
+                thumbstick: { x: 0, y: 0, pressed: false }, // -1.0 to 1.0
+                x: false,           // boolean
+                y: false,           // boolean
+                connected: false,
+                handedness: 'left'
+            },
+            right: {
+                trigger: 0,
+                grip: false,
+                menu: false,
+                thumbstick: { x: 0, y: 0, pressed: false },
+                a: false,
+                b: false,
+                connected: false,
+                handedness: 'right'
+            }
+        };
+
+        // Game state
+        const gameState = {
+            cursor: { x: 300, y: 200 },
+            targets: [],
+            score: 0,
+            hits: 0,
+            shots: 0,
+            gamepadConnected: false
+        };
+
+        // DOM elements
+        const canvas = document.getElementById('gameCanvas');
+        const cursor = document.getElementById('cursor');
+        const laser = document.getElementById('laser');
+        const logPanel = document.getElementById('logPanel');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        // Initialize
+        updateCursorPosition();
+        spawnTarget();
+        spawnTarget();
+        updateUI();
+
+        // Gamepad API integration
+        window.addEventListener('gamepadconnected', (e) => {
+            gameState.gamepadConnected = true;
+            connectionStatus.textContent = `🎮 ${e.gamepad.id}`;
+            connectionStatus.className = 'connection-status connected';
+            log('Gamepad connected: ' + e.gamepad.id, 'info');
+        });
+
+        window.addEventListener('gamepaddisconnected', (e) => {
+            gameState.gamepadConnected = false;
+            connectionStatus.textContent = '🎮 Connect Controller';
+            connectionStatus.className = 'connection-status disconnected';
+            log('Gamepad disconnected', 'info');
+        });
+
+        // Main update loop
+        function updateControllers() {
+            const gamepads = navigator.getGamepads();
+            
+            for (let i = 0; i < gamepads.length; i++) {
+                const gp = gamepads[i];
+                if (gp) {
+                    // Map gamepad to Quest 3 controllers
+                    mapGamepadToQuest(gp);
+                    break;
+                }
+            }
+            
+            updateDisplay();
+            updateCursorFromControllers();
+            requestAnimationFrame(updateControllers);
+        }
+
+        function mapGamepadToQuest(gamepad) {
+            // Left controller (mapped to left side of gamepad)
+            questControllers.left.trigger = gamepad.buttons[6] ? gamepad.buttons[6].value : 0; // LT
+            questControllers.left.grip = gamepad.buttons[4] ? gamepad.buttons[4].pressed : false; // LB
+            questControllers.left.menu = gamepad.buttons[8] ? gamepad.buttons[8].pressed : false; // Select/Back
+            questControllers.left.thumbstick.x = gamepad.axes[0] || 0;
+            questControllers.left.thumbstick.y = gamepad.axes[1] || 0;
+            questControllers.left.thumbstick.pressed = gamepad.buttons[10] ? gamepad.buttons[10].pressed : false; // Left stick
+            questControllers.left.x = gamepad.buttons[2] ? gamepad.buttons[2].pressed : false; // X
+            questControllers.left.y = gamepad.buttons[3] ? gamepad.buttons[3].pressed : false; // Y
+            questControllers.left.connected = true;
+
+            // Right controller (mapped to right side of gamepad)
+            questControllers.right.trigger = gamepad.buttons[7] ? gamepad.buttons[7].value : 0; // RT
+            questControllers.right.grip = gamepad.buttons[5] ? gamepad.buttons[5].pressed : false; // RB
+            questControllers.right.menu = gamepad.buttons[9] ? gamepad.buttons[9].pressed : false; // Start
+            questControllers.right.thumbstick.x = gamepad.axes[2] || 0;
+            questControllers.right.thumbstick.y = gamepad.axes[3] || 0;
+            questControllers.right.thumbstick.pressed = gamepad.buttons[11] ? gamepad.buttons[11].pressed : false; // Right stick
+            questControllers.right.a = gamepad.buttons[0] ? gamepad.buttons[0].pressed : false; // A
+            questControllers.right.b = gamepad.buttons[1] ? gamepad.buttons[1].pressed : false; // B
+            questControllers.right.connected = true;
+
+            // Shooting with triggers
+            if (questControllers.right.trigger > 0.5) {
+                shoot();
+            }
+        }
+
+        // Keyboard controls
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            
+            switch(e.code) {
+                case 'Space':
+                    questControllers.right.trigger = 1;
+                    shoot();
+                    log('Space pressed - Right trigger', 'action');
+                    break;
+                case 'Enter':
+                    questControllers.left.trigger = 1;
+                    log('Enter pressed - Left trigger', 'action');
+                    break;
+                case 'ShiftLeft':
+                    questControllers.left.grip = true;
+                    log('Left Shift - Left grip', 'action');
+                    break;
+                case 'ShiftRight':
+                    questControllers.right.grip = true;
+                    log('Right Shift - Right grip', 'action');
+                    break;
+            }
+            updateKeyboardMovement();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+            
+            switch(e.code) {
+                case 'Space':
+                    questControllers.right.trigger = 0;
+                    break;
+                case 'Enter':
+                    questControllers.left.trigger = 0;
+                    break;
+                case 'ShiftLeft':
+                    questControllers.left.grip = false;
+                    break;
+                case 'ShiftRight':
+                    questControllers.right.grip = false;
+                    break;
+            }
+            updateKeyboardMovement();
+        });
+
+        function updateKeyboardMovement() {
+            let moveX = 0, moveY = 0;
+            
+            if (keys['KeyW']) moveY = -1;
+            if (keys['KeyS']) moveY = 1;
+            if (keys['KeyA']) moveX = -1;
+            if (keys['KeyD']) moveX = 1;
+            
+            questControllers.left.thumbstick.x = moveX;
+            questControllers.left.thumbstick.y = moveY;
+            
+            // Arrow keys for right stick (camera/aiming)
+            let lookX = 0, lookY = 0;
+            if (keys['ArrowLeft']) lookX = -1;
+            if (keys['ArrowRight']) lookX = 1;
+            if (keys['ArrowUp']) lookY = -1;
+            if (keys['ArrowDown']) lookY = 1;
+            
+            questControllers.right.thumbstick.x = lookX;
+            questControllers.right.thumbstick.y = lookY;
+        }
+
+        // Mouse controls
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            gameState.cursor.x = ((e.clientX - rect.left) / rect.width) * canvas.offsetWidth;
+            gameState.cursor.y = ((e.clientY - rect.top) / rect.height) * canvas.offsetHeight;
+            updateCursorPosition();
+            showLaser();
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                questControllers.right.trigger = 1;
+                shoot();
+                log('Mouse click - Right trigger', 'action');
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0) {
+                questControllers.right.trigger = 0;
+            }
+        });
+
+        // Manual button testing (clicking on buttons)
+        document.querySelectorAll('.button').forEach(button => {
+            button.addEventListener('mousedown', () => {
+                button.classList.add('pressed');
+                const id = button.id;
+                log(`Manual button test: ${id}`, 'action');
+                
+                // Simulate button press
+                const [side, buttonName] = id.split('-');
+                if (buttonName === 'trigger') {
+                    questControllers[side].trigger = 1;
+                } else if (questControllers[side].hasOwnProperty(buttonName.replace('-btn', ''))) {
+                    questControllers[side][buttonName.replace('-btn', '')] = true;
+                }
+            });
+            
+            button.addEventListener('mouseup', () => {
+                button.classList.remove('pressed');
+                const [side, buttonName] = id.split('-');
+                if (buttonName === 'trigger') {
+                    questControllers[side].trigger = 0;
+                } else if (questControllers[side].hasOwnProperty(buttonName.replace('-btn', ''))) {
+                    questControllers[side][buttonName.replace('-btn', '')] = false;
+                }
+            });
+        });
+
+        // Game functions
+        function shoot() {
+            gameState.shots++;
+            const targets = document.querySelectorAll('.target');
+            let hit = false;
+            
+            targets.forEach(target => {
+                const targetRect = target.getBoundingClientRect();
+                const canvasRect = canvas.getBoundingClientRect();
+                const targetX = targetRect.left - canvasRect.left + target.offsetWidth/2;
+                const targetY = targetRect.top - canvasRect.top + target.offsetHeight/2;
+                
+                const distance = Math.sqrt(
+                    Math.pow(gameState.cursor.x - targetX, 2) + 
+                    Math.pow(gameState.cursor.y - targetY, 2)
+                );
+                
+                if (distance < 30) {
+                    target.remove();
+                    gameState.score += 10;
+                    gameState.hits++;
+                    hit = true;
+                    log(`Target hit! Score: ${gameState.score}`, 'hit');
+                    spawnTarget();
+                }
+            });
+            
+            if (!hit) {
+                log('Shot missed', 'action');
+            }
+            
+            updateUI();
+        }
+
+        function spawnTarget() {
+            const target = document.createElement('div');
+            target.className = 'target';
+            target.style.left = (Math.random() * (canvas.offsetWidth - 40)) + 'px';
+            target.style.top = (Math.random() * (canvas.offsetHeight - 40)) + 'px';
+            canvas.appendChild(target);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                if (target.parentNode) {
+                    target.remove();
+                    spawnTarget();
+                }
+            }, 5000);
+        }
+
+        function updateCursorFromControllers() {
+            // Move cursor based on right thumbstick
+            const sensitivity = 5;
+            gameState.cursor.x += questControllers.right.thumbstick.x * sensitivity;
+            gameState.cursor.y += questControllers.right.thumbstick.y * sensitivity;
+            
+            // Clamp cursor to canvas bounds
+            gameState.cursor.x = Math.max(10, Math.min(canvas.offsetWidth - 10, gameState.cursor.x));
+            gameState.cursor.y = Math.max(10, Math.min(canvas.offsetHeight - 10, gameState.cursor.y));
+            
+            updateCursorPosition();
+        }
+
+        function updateCursorPosition() {
+            cursor.style.left = gameState.cursor.x + 'px';
+            cursor.style.top = gameState.cursor.y + 'px';
+        }
+
+        function showLaser() {
+            laser.style.left = gameState.cursor.x + 'px';
+            laser.style.top = gameState.cursor.y + 'px';
+            laser.style.width = '100px';
+            laser.style.display = 'block';
+            
+            setTimeout(() => {
+                laser.style.display = 'none';
+            }, 100);
+        }
+
+        function updateDisplay() {
+            // Update button states
+            Object.entries(questControllers).forEach(([side, controller]) => {
+                Object.entries(controller).forEach(([key, value]) => {
+                    const element = document.getElementById(`${side}-${key}`);
+                    if (element) {
+                        if (typeof value === 'boolean') {
+                            element.className = value ? 'button active' : 'button inactive';
+                        } else if (key === 'trigger') {
+                            element.className = value > 0 ? 'button active' : 'button inactive';
+                            document.getElementById(`${side}-trigger-val`).textContent = value.toFixed(2);
+                            document.getElementById(`${side}-trigger-bar`).style.width = (value * 100) + '%';
+                        }
+                    }
+                });
+                
+                // Update thumbstick displays
+                if (controller.thumbstick) {
+                    document.getElementById(`${side}-stick-x-val`).textContent = controller.thumbstick.x.toFixed(2);
+                    document.getElementById(`${side}-stick-y-val`).textContent = controller.thumbstick.y.toFixed(2);
+                    document.getElementById(`${side}-stick-x-bar`).style.width = ((controller.thumbstick.x + 1) / 2 * 100) + '%';
+                    document.getElementById(`${side}-stick-y-bar`).style.width = ((controller.thumbstick.y + 1) / 2 * 100) + '%';
+                    
+                    const stickBtn = document.getElementById(`${side}-thumbstick-btn`);
+                    if (stickBtn) {
+                        stickBtn.className = controller.thumbstick.pressed ? 'button active' : 'button inactive';
+                    }
+                }
+            });
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('hits').textContent = gameState.hits;
+            document.getElementById('target-count').textContent = document.querySelectorAll('.target').length;
+            
+            const accuracy = gameState.shots > 0 ? Math.round((gameState.hits / gameState.shots) * 100) : 0;
+            document.getElementById('accuracy').textContent = accuracy + '%';
+        }
+
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logPanel.appendChild(entry);
+            logPanel.scrollTop = logPanel.scrollHeight;
+            
+            // Keep only last 50 entries
+            while (logPanel.children.length > 50) {
+                logPanel.removeChild(logPanel.firstChild);
+            }
+        }
+
+        // Start the main loop
+        updateControllers();
+        
+        // Initial log messages
+        log('Quest 3 Controller Testing Suite ready!', 'info');
+        log('Try: Mouse movement, WASD keys, gamepad, or manual button clicks', 'info');
+    </script>
+</body>
+</html>

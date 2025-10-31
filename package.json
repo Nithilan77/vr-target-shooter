@@ -1,0 +1,15 @@
+{
+  "name": "quest3-webxr-demo",
+  "version": "0.1.0",
+  "description": "Simple WebXR demo for Meta Quest 3 with controller detection (Three.js)",
+  "scripts": {
+    "start": "http-server -p 8080 -c-1 ./",
+    "start-8010": "http-server -p 8010 -c-1 ./",
+    "start-7800": "http-server -p 7800 -c-1 ./",
+    "start-7700": "http-server -p 7700 -c-1 ./",
+    "start-https-mkcert": "http-server -S -C cert.pem -K key.pem -p 8080 ./"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

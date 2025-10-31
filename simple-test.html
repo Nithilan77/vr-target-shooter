@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>VR Test - Simple</title>
+    <style>
+        body { margin: 0; background: #000; }
+        canvas { display: block; }
+        #info { position: fixed; top: 10px; left: 10px; color: white; font-family: Arial; z-index: 100; }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>🎯 VR Target Shooter</h3>
+        <div id="status">Loading...</div>
+    </div>
+
+    <script>
+        document.getElementById('status').innerHTML = 'Starting initialization...';
+        
+        // Test if we can create a basic WebGL context
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (gl) {
+                document.getElementById('status').innerHTML = 'WebGL supported ✓<br>Loading Three.js...';
+            } else {
+                document.getElementById('status').innerHTML = 'WebGL NOT supported ✗';
+            }
+        } catch(e) {
+            document.getElementById('status').innerHTML = 'WebGL test failed: ' + e.message;
+        }
+    </script>
+
+    <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+    
+    <script>
+        // Wait for Three.js to load
+        window.addEventListener('load', function() {
+            try {
+                if (typeof THREE === 'undefined') {
+                    document.getElementById('status').innerHTML += '<br>Three.js failed to load ✗';
+                    return;
+                }
+                
+                document.getElementById('status').innerHTML += '<br>Three.js loaded ✓<br>Creating scene...';
+                
+                // Create basic scene
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x222233);
+                
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.z = 5;
+                
+                const renderer = new THREE.WebGLRenderer();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(renderer.domElement);
+                
+                // Add a simple rotating cube
+                const geometry = new THREE.BoxGeometry();
+                const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+                const cube = new THREE.Mesh(geometry, material);
+                scene.add(cube);
+                
+                // Add some lights
+                const light = new THREE.DirectionalLight(0xffffff, 1);
+                light.position.set(1, 1, 1);
+                scene.add(light);
+                
+                document.getElementById('status').innerHTML += '<br>Scene created ✓<br>Starting animation...';
+                
+                // Animation loop
+                function animate() {
+                    requestAnimationFrame(animate);
+                    cube.rotation.x += 0.01;
+                    cube.rotation.y += 0.01;
+                    renderer.render(scene, camera);
+                }
+                animate();
+                
+                document.getElementById('status').innerHTML += '<br>Animation started ✓<br><strong>You should see a spinning green cube!</strong>';
+                
+                // Test VR availability
+                if ('xr' in navigator) {
+                    navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+                        if (supported) {
+                            document.getElementById('status').innerHTML += '<br>VR supported ✓';
+                            
+                            // Create VR button
+                            const vrButton = document.createElement('button');
+                            vrButton.textContent = 'ENTER VR';
+                            vrButton.style.cssText = `
+                                position: absolute; bottom: 20px; left: 50%; 
+                                transform: translateX(-50%); padding: 12px 20px; 
+                                background: #006600; color: white; border: none; 
+                                font-size: 16px; cursor: pointer;
+                            `;
+                            document.body.appendChild(vrButton);
+                            
+                            vrButton.onclick = () => {
+                                navigator.xr.requestSession('immersive-vr').then((session) => {
+                                    renderer.xr.enabled = true;
+                                    renderer.xr.setSession(session);
+                                    document.getElementById('status').innerHTML += '<br>VR session started ✓';
+                                }).catch((err) => {
+                                    document.getElementById('status').innerHTML += '<br>VR session failed: ' + err.message;
+                                });
+                            };
+                        } else {
+                            document.getElementById('status').innerHTML += '<br>VR not supported on this device';
+                        }
+                    }).catch((err) => {
+                        document.getElementById('status').innerHTML += '<br>VR check failed: ' + err.message;
+                    });
+                } else {
+                    document.getElementById('status').innerHTML += '<br>WebXR not available in this browser';
+                }
+                
+            } catch (error) {
+                document.getElementById('status').innerHTML += '<br>Error: ' + error.message;
+                console.error('Scene creation error:', error);
+            }
+        });
+    </script>
+</body>
+</html>

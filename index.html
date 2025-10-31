@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,viewport-fit=cover">
+  <title>VR Target Shooter - Quest 3</title>
+  <style>
+    html,body{height:100%;margin:0;background:#111;color:#ddd;font-family:Arial,Helvetica,sans-serif}
+    #info{position:fixed;left:10px;top:10px;z-index:2;background:rgba(0,0,0,0.45);padding:10px;border-radius:6px}
+    #status{margin-top:6px;font-size:13px}
+    canvas{display:block}
+    a.small{color:#9cf}
+    #loadingStatus{margin-top:10px;font-size:12px;color:#aaf}
+  </style>
+</head>
+<body>
+  <div id="info">
+    <strong>🎯 VR Target Shooter</strong><br>
+    <div id="gameStats">
+      Score: <span id="score">0</span> | Time: <span id="timer">60</span>s | Targets: <span id="targetCount">0</span>
+    </div>
+    <div id="status">Controllers: <span id="ctrlStatus">none</span></div>
+    <div style="margin-top:6px;font-size:13px">
+      <strong>How to play:</strong><br>
+      • Aim with controller laser pointer<br>
+      • Pull <em>trigger</em> to shoot targets<br>
+      • Hit red targets for points!<br>
+      • <em>Squeeze</em> to restart game
+    </div>
+    <div id="gameOver" style="display:none;margin-top:10px;color:#ff6666;font-weight:bold">
+      🎮 Game Over! Final Score: <span id="finalScore">0</span>
+    </div>
+    <div id="loadingStatus">Loading Three.js...</div>
+  </div>
+
+  <!-- Load Three.js from CDN -->
+  <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+  <script>
+    // Check if Three.js loaded and create VRButton fallback
+    window.addEventListener('load', function() {
+      if (typeof THREE !== 'undefined') {
+        document.getElementById('loadingStatus').textContent = 'Three.js loaded successfully!';
+        
+        // Create VRButton manually if it doesn't exist
+        if (!THREE.VRButton) {
+          THREE.VRButton = {
+            createButton: function(renderer) {
+              const button = document.createElement('button');
+              button.textContent = 'ENTER VR';
+              button.style.cssText = `
+                position: absolute;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 12px 20px;
+                border: 1px solid #fff;
+                background: rgba(0,0,0,0.8);
+                color: #fff;
+                font-size: 13px;
+                cursor: pointer;
+                z-index: 999;
+              `;
+              
+              button.onclick = function() {
+                if (navigator.xr) {
+                  navigator.xr.requestSession('immersive-vr').then(function(session) {
+                    renderer.xr.setSession(session);
+                  }).catch(function(error) {
+                    console.log('VR not available:', error);
+                    button.textContent = 'VR NOT AVAILABLE';
+                  });
+                } else {
+                  button.textContent = 'WEBXR NOT SUPPORTED';
+                }
+              };
+              
+              return button;
+            }
+          };
+        }
+        
+        // Create XRControllerModelFactory fallback
+        if (!THREE.XRControllerModelFactory) {
+          THREE.XRControllerModelFactory = function() {
+            this.createControllerModel = function(controller) {
+              const geometry = new THREE.ConeGeometry(0.02, 0.2, 8);
+              const material = new THREE.MeshStandardMaterial({ color: 0x666666 });
+              const mesh = new THREE.Mesh(geometry, material);
+              mesh.rotation.x = Math.PI / 2;
+              return mesh;
+            };
+          };
+        }
+      } else {
+        document.getElementById('loadingStatus').textContent = 'Error: Three.js failed to load!';
+        document.getElementById('loadingStatus').style.color = '#ff6666';
+      }
+    });
+  </script>
+  <script src="./js/main-fixed.js"></script>
+</body>
+</html>

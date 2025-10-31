@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,viewport-fit=cover">
+  <title>VR Target Shooter - Fixed</title>
+  <style>
+    html,body{height:100%;margin:0;background:#111;color:#ddd;font-family:Arial,Helvetica,sans-serif}
+    #info{position:fixed;left:10px;top:10px;z-index:2;background:rgba(0,0,0,0.45);padding:10px;border-radius:6px}
+    canvas{display:block}
+  </style>
+</head>
+<body>
+  <div id="info">
+    <strong>🎯 VR Target Shooter</strong><br>
+    <div id="gameStats">
+      Score: <span id="score">0</span> | Time: <span id="timer">60</span>s | Status: <span id="status">Loading...</span>
+    </div>
+    <div style="margin-top:6px;font-size:13px">
+      <strong>Controls:</strong><br>
+      • <em>Click:</em> Start game / Shoot<br>
+      • <em>Mouse:</em> Aim at red targets
+    </div>
+  </div>
+
+  <!-- Load Three.js from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/VRButton.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/XRControllerModelFactory.js"></script>
+  
+  <script>
+    console.log('Starting VR Target Shooter...');
+    
+    // Check if Three.js loaded
+    if (typeof THREE === 'undefined') {
+      document.getElementById('status').textContent = 'Three.js failed to load';
+      console.error('Three.js not loaded');
+    } else {
+      console.log('Three.js loaded successfully');
+      document.getElementById('status').textContent = 'Three.js loaded';
+      
+      // Initialize the game
+      init();
+    }
+    
+    function init() {
+      try {
+        // Game state
+        const gameState = {
+          score: 0,
+          timeLeft: 60,
+          gameRunning: false,
+          gameStarted: false
+        };
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        
+        // Create a 3D sky dome instead of flat background
+        const skyGeometry = new THREE.SphereGeometry(50, 32, 16);
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 256;
+        const context = canvas.getContext('2d');
+        
+        // Create a more complex sky gradient
+        const gradient = context.createLinearGradient(0, 0, 0, 256);
+        gradient.addColorStop(0, '#87CEEB'); // Light sky blue at top
+        gradient.addColorStop(0.3, '#4682B4'); // Steel blue
+        gradient.addColorStop(0.7, '#2F4F4F'); // Dark slate gray
+        gradient.addColorStop(1, '#191970'); // Midnight blue at bottom
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 512, 256);
+        
+        // Add some simple cloud shapes
+        context.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        for (let i = 0; i < 8; i++) {
+          const x = Math.random() * 512;
+          const y = 50 + Math.random() * 100;
+          const size = 30 + Math.random() * 40;
+          context.beginPath();
+          context.ellipse(x, y, size, size * 0.6, 0, 0, Math.PI * 2);
+          context.fill();
+        }
+        
+        const skyTexture = new THREE.CanvasTexture(canvas);
+        const skyMaterial = new THREE.MeshBasicMaterial({ 
+          map: skyTexture, 
+          side: THREE.BackSide // Render inside of sphere
+        });
+        const skyDome = new THREE.Mesh(skyGeometry, skyMaterial);
+        scene.add(skyDome);
+        console.log('Scene with 3D sky dome created');
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 1.6, 3);
+        console.log('Camera created');
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true; // Enable WebXR
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+        
+        // Add VR Button for Quest 3
+        if (typeof VRButton !== 'undefined') {
+          const vrButton = VRButton.createButton(renderer);
+          vrButton.style.position = 'fixed';
+          vrButton.style.bottom = '20px';
+          vrButton.style.right = '20px';
+          vrButton.style.zIndex = '999';
+          vrButton.style.backgroundColor = '#00aa00';
+          vrButton.style.color = 'white';
+          vrButton.style.border = '2px solid #00ff00';
+          vrButton.style.borderRadius = '8px';
+          vrButton.style.padding = '12px 24px';
+          vrButton.style.fontSize = '16px';
+          vrButton.style.fontWeight = 'bold';
+          document.body.appendChild(vrButton);
+          
+          // VR session event listeners
+          renderer.xr.addEventListener('sessionstart', () => {
+            console.log('VR Session Started - Quest 3 Mode Active');
+            document.getElementById('status').textContent = 'VR Mode Active - Use controllers to aim and shoot!';
+          });
+          
+          renderer.xr.addEventListener('sessionend', () => {
+            console.log('VR Session Ended');
+            document.getElementById('status').textContent = 'VR Session Ended - Click to start desktop mode';
+          });
+        } else {
+          console.log('VRButton not available - VR mode disabled');
+        }
+        
+        console.log('Renderer with WebXR enabled and VR button added');
+
+        // Lighting - warmer and more natural
+        const ambientLight = new THREE.AmbientLight(0x87CEEB, 0.4); // Soft sky blue ambient
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xFFE4B5, 1.0); // Warm sunlight
+        directionalLight.position.set(-5, 8, 3);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+        
+        // Add a second fill light
+        const fillLight = new THREE.DirectionalLight(0xB0E0E6, 0.3); // Cool fill light
+        fillLight.position.set(5, 3, -2);
+        scene.add(fillLight);
+        console.log('Enhanced lighting added');
+
+        // Enhanced floor with grid pattern
+        const floorGeometry = new THREE.PlaneGeometry(60, 60, 20, 20);
+        const floorMaterial = new THREE.MeshLambertMaterial({ 
+          color: 0x2F4F2F, // Dark sea green
+          wireframe: false 
+        });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+        
+        // Add a subtle grid overlay
+        const gridHelper = new THREE.GridHelper(60, 30, 0x4F6F4F, 0x3F5F3F);
+        gridHelper.position.y = 0.01; // Slightly above floor to prevent z-fighting
+        scene.add(gridHelper);
+        
+        // Add atmospheric fog for depth
+        scene.fog = new THREE.Fog(0x4682B4, 20, 45);
+        
+        // Add some simple geometric shapes as environment
+        addEnvironmentObjects(scene);
+        console.log('Enhanced floor, fog, and environment added');
+
+        // Environment decoration function
+        function addEnvironmentObjects(scene) {
+          // Create layered mountain ranges for depth
+          const mountainColors = [0x8B7355, 0x696969, 0x4F4F4F]; // Brown to gray gradient
+          
+          for (let layer = 0; layer < 3; layer++) {
+            const distance = 15 + (layer * 8);
+            const height = 4 + (layer * 2);
+            
+            for (let i = 0; i < 8; i++) {
+              const mountainGeometry = new THREE.ConeGeometry(2 + layer, height, 6);
+              const mountainMaterial = new THREE.MeshLambertMaterial({ 
+                color: mountainColors[layer],
+                transparent: true,
+                opacity: 0.9 - (layer * 0.1) // Fade distant mountains
+              });
+              
+              const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+              const angle = (i / 8) * Math.PI * 2;
+              mountain.position.set(
+                Math.sin(angle) * distance,
+                height / 2,
+                Math.cos(angle) * distance
+              );
+              mountain.scale.set(
+                0.7 + Math.random() * 0.6,
+                0.8 + Math.random() * 0.4,
+                0.7 + Math.random() * 0.6
+              );
+              scene.add(mountain);
+            }
+          }
+          
+          // Add floating platforms at different heights
+          const platformGeometry = new THREE.CylinderGeometry(1.5, 1.5, 0.3, 8);
+          const platformMaterial = new THREE.MeshLambertMaterial({ color: 0x708090 });
+          
+          for (let i = 0; i < 4; i++) {
+            const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+            const angle = (i / 4) * Math.PI * 2 + Math.PI/4;
+            platform.position.set(
+              Math.sin(angle) * (6 + i),
+              1 + i * 0.8,
+              Math.cos(angle) * (6 + i)
+            );
+            platform.castShadow = true;
+            platform.receiveShadow = true;
+            scene.add(platform);
+            
+            // Add small pillars under platforms
+            const pillarGeometry = new THREE.CylinderGeometry(0.2, 0.3, platform.position.y, 6);
+            const pillarMaterial = new THREE.MeshLambertMaterial({ color: 0x556B2F });
+            const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+            pillar.position.set(platform.position.x, platform.position.y / 2, platform.position.z);
+            pillar.castShadow = true;
+            scene.add(pillar);
+          }
+          
+          // Add some tall crystal-like structures
+          const crystalGeometry = new THREE.OctahedronGeometry(0.8);
+          const crystalMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x40E0D0,
+            transparent: true,
+            opacity: 0.7
+          });
+          
+          for (let i = 0; i < 3; i++) {
+            const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
+            const angle = Math.random() * Math.PI * 2;
+            crystal.position.set(
+              Math.sin(angle) * (8 + Math.random() * 4),
+              2 + Math.random() * 2,
+              Math.cos(angle) * (8 + Math.random() * 4)
+            );
+            crystal.scale.set(1, 2 + Math.random(), 1);
+            crystal.rotation.y = Math.random() * Math.PI;
+            crystal.castShadow = true;
+            scene.add(crystal);
+          }
+          
+          // Add scattered rocks/boulders on the ground
+          const rockGeometry = new THREE.DodecahedronGeometry(0.5);
+          const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x708090 });
+          
+          for (let i = 0; i < 6; i++) {
+            const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+            rock.position.set(
+              (Math.random() - 0.5) * 20,
+              0.3,
+              (Math.random() - 0.5) * 20
+            );
+            rock.scale.set(
+              0.5 + Math.random() * 0.8,
+              0.3 + Math.random() * 0.4,
+              0.5 + Math.random() * 0.8
+            );
+            rock.rotation.set(
+              Math.random() * Math.PI,
+              Math.random() * Math.PI,
+              Math.random() * Math.PI
+            );
+            rock.castShadow = true;
+            scene.add(rock);
+          }
+        }
+
+        // Targets group
+        const targets = new THREE.Group();
+        scene.add(targets);
+
+        // VR Movement system
+        const vrMovement = {
+          moveSpeed: 0.1,
+          turnSpeed: 0.05,
+          playerGroup: new THREE.Group() // Group to hold camera and move player
+        };
+        
+        // Add camera to player group for movement
+        vrMovement.playerGroup.add(camera);
+        scene.add(vrMovement.playerGroup);
+
+        // VR Controllers setup
+        const controller1 = renderer.xr.getController(0);
+        controller1.addEventListener('selectstart', onSelectStart);
+        controller1.addEventListener('selectend', onSelectEnd);
+        controller1.addEventListener('connected', (event) => {
+          console.log('Controller 1 connected:', event.data.handedness);
+        });
+        scene.add(controller1);
+
+        const controller2 = renderer.xr.getController(1);
+        controller2.addEventListener('selectstart', onSelectStart);
+        controller2.addEventListener('selectend', onSelectEnd);
+        controller2.addEventListener('connected', (event) => {
+          console.log('Controller 2 connected:', event.data.handedness);
+        });
+        scene.add(controller2);
+
+        // Controller models (grips) - fallback if XRControllerModelFactory not available
+        let controllerModelFactory;
+        try {
+          controllerModelFactory = new THREE.XRControllerModelFactory();
+        } catch (e) {
+          console.log('XRControllerModelFactory not available, using basic controllers');
+        }
+        
+        const controllerGrip1 = renderer.xr.getControllerGrip(0);
+        if (controllerModelFactory) {
+          controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+        }
+        scene.add(controllerGrip1);
+
+        const controllerGrip2 = renderer.xr.getControllerGrip(1);
+        if (controllerModelFactory) {
+          controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+        }
+        scene.add(controllerGrip2);
+
+        // Add laser pointers to controllers
+        const laserGeometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(0, 0, -5)
+        ]);
+        const laserMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+
+        const laser1 = new THREE.Line(laserGeometry, laserMaterial);
+        const laser2 = new THREE.Line(laserGeometry, laserMaterial);
+        controller1.add(laser1);
+        controller2.add(laser2);
+
+        // VR UI Panel - floating score display
+        const vrUI = createVRUI();
+        scene.add(vrUI);
+
+        function createVRUI() {
+          const group = new THREE.Group();
+          
+          // Create canvas for UI text
+          const canvas = document.createElement('canvas');
+          canvas.width = 512;
+          canvas.height = 256;
+          const context = canvas.getContext('2d');
+          
+          // UI Panel background
+          const panelGeometry = new THREE.PlaneGeometry(2, 1);
+          const panelTexture = new THREE.CanvasTexture(canvas);
+          const panelMaterial = new THREE.MeshBasicMaterial({ 
+            map: panelTexture,
+            transparent: true,
+            opacity: 0.9
+          });
+          const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+          
+          // Position UI panel in VR space (relative to player)
+          panel.position.set(0, 2.5, -2);
+          group.add(panel);
+          
+          // Make UI follow player
+          vrMovement.playerGroup.add(group);
+          
+          // Store references for updating
+          group.userData.canvas = canvas;
+          group.userData.context = context;
+          group.userData.texture = panelTexture;
+          
+          return group;
+        }
+
+        function updateVRUI() {
+          const canvas = vrUI.userData.canvas;
+          const context = vrUI.userData.context;
+          const texture = vrUI.userData.texture;
+          
+          // Clear canvas
+          context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Draw border
+          context.strokeStyle = '#00ff00';
+          context.lineWidth = 4;
+          context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+          
+          // Draw title
+          context.fillStyle = '#00ff00';
+          context.font = 'bold 32px Arial';
+          context.textAlign = 'center';
+          context.fillText('🎯 VR TARGET SHOOTER', canvas.width / 2, 60);
+          
+          // Draw game stats
+          context.font = 'bold 28px Arial';
+          context.fillStyle = '#ffffff';
+          context.fillText(`Score: ${gameState.score}`, canvas.width / 4, 120);
+          context.fillText(`Time: ${gameState.timeLeft}s`, canvas.width * 3 / 4, 120);
+          context.fillText(`Targets: ${targets.children.length}`, canvas.width / 2, 160);
+          
+          // Draw status and controls
+          context.font = '18px Arial';
+          context.fillStyle = gameState.gameRunning ? '#00ff00' : '#ffff00';
+          const status = gameState.gameRunning ? 'AIM & SHOOT! MOVE WITH LEFT STICK!' : 
+                        gameState.gameStarted ? 'GAME OVER - PULL TRIGGER TO RESTART' : 'PULL TRIGGER TO START';
+          context.fillText(status, canvas.width / 2, 190);
+          
+          // Draw controls
+          context.font = '14px Arial';
+          context.fillStyle = '#cccccc';
+          context.fillText('LEFT STICK: Move Around | RIGHT STICK: Turn | TRIGGER: Shoot', canvas.width / 2, 220);
+          
+          // Update texture
+          texture.needsUpdate = true;
+        }
+
+        function spawnTargetBehind() {
+          const geometry = new THREE.SphereGeometry(0.35, 16, 12);
+          const material = new THREE.MeshLambertMaterial({ 
+            color: 0xff6600, // Orange for behind targets
+            emissive: 0x331100
+          });
+          const target = new THREE.Mesh(geometry, material);
+          target.castShadow = true;
+          
+          // Spawn behind player (180 degrees + some variance)
+          const angle = Math.PI + (Math.random() - 0.5) * Math.PI; // Behind player
+          const distance = 3 + Math.random() * 6;
+          const height = 1 + Math.random() * 3;
+          
+          const playerPos = vrMovement.playerGroup.position;
+          
+          target.position.set(
+            playerPos.x + Math.sin(angle) * distance,
+            height,
+            playerPos.z + Math.cos(angle) * distance
+          );
+          
+          // Orange glow for behind targets
+          const glowGeometry = new THREE.SphereGeometry(0.4, 8, 6);
+          const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff6600,
+            transparent: true,
+            opacity: 0.4
+          });
+          const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+          target.add(glow);
+          
+          targets.add(target);
+          console.log('Behind target spawned at:', target.position);
+          
+          // Auto-remove after 10 seconds (longer for behind targets)
+          setTimeout(() => {
+            if (target.parent) {
+              targets.remove(target);
+              updateUI();
+              updateVRUI();
+            }
+          }, 10000);
+        }
+
+        // VR Controller event handlers
+        function onSelectStart(event) {
+          const controller = event.target;
+          
+          if (!gameState.gameStarted) {
+            startGame();
+            return;
+          }
+          
+          if (!gameState.gameRunning) return;
+          
+          // VR raycast shooting
+          shootWithController(controller);
+        }
+
+        function onSelectEnd(event) {
+          // Controller release handling if needed
+        }
+
+        function shootWithController(controller) {
+          // Create raycaster from controller
+          const tempMatrix = new THREE.Matrix4();
+          tempMatrix.identity().extractRotation(controller.matrixWorld);
+          
+          const raycaster = new THREE.Raycaster();
+          raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+          raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+          
+          // Check for target hits
+          const intersects = raycaster.intersectObjects(targets.children);
+          
+          if (intersects.length > 0) {
+            const hitTarget = intersects[0].object;
+            targets.remove(hitTarget);
+            gameState.score += 10;
+            updateUI();
+            updateVRUI();
+            console.log('VR Target hit! Score:', gameState.score);
+            
+            // Add haptic feedback
+            if (controller.gamepad && controller.gamepad.hapticActuators) {
+              controller.gamepad.hapticActuators[0].pulse(0.8, 100);
+            }
+            
+            // Spawn new target
+            if (targets.children.length < 3) {
+              spawnTarget();
+            }
+          }
+        }
+
+        // Mouse controls
+        const mouse = new THREE.Vector2();
+        const raycaster = new THREE.Raycaster();
+        
+        function onMouseMove(event) {
+          mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+          mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+        
+        function onMouseClick(event) {
+          if (!gameState.gameStarted) {
+            startGame();
+            return;
+          }
+          
+          if (!gameState.gameRunning) return;
+          
+          // Raycast to check for target hits
+          raycaster.setFromCamera(mouse, camera);
+          const intersects = raycaster.intersectObjects(targets.children);
+          
+          if (intersects.length > 0) {
+            const hitTarget = intersects[0].object;
+            targets.remove(hitTarget);
+            gameState.score += 10;
+            updateUI();
+            updateVRUI();
+            console.log('Target hit! Score:', gameState.score);
+            
+            // Spawn new target
+            if (targets.children.length < 3) {
+              spawnTarget();
+            }
+          }
+        }
+        
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('click', onMouseClick);
+        console.log('Mouse events added');
+
+        // Game functions
+        function startGame() {
+          console.log('Starting game...');
+          gameState.gameStarted = true;
+          gameState.gameRunning = true;
+          gameState.score = 0;
+          gameState.timeLeft = 60;
+          
+          // Clear existing targets
+          while (targets.children.length > 0) {
+            targets.remove(targets.children[0]);
+          }
+          
+          updateUI();
+          updateVRUI();
+          spawnTarget();
+          spawnTarget();
+          gameTimer();
+          
+          document.getElementById('status').textContent = 'Game running!';
+        }
+
+        function gameTimer() {
+          if (!gameState.gameRunning) return;
+          
+          gameState.timeLeft--;
+          updateUI();
+          updateVRUI();
+          
+          if (gameState.timeLeft <= 0) {
+            gameState.gameRunning = false;
+            document.getElementById('status').textContent = `Game Over! Final Score: ${gameState.score}`;
+            updateVRUI();
+            return;
+          }
+          
+          // Randomly spawn new targets (more frequent for VR movement)
+          if (Math.random() < 0.4 && targets.children.length < 8) {
+            spawnTarget();
+          }
+          
+          // Occasionally spawn targets behind the player
+          if (Math.random() < 0.15 && targets.children.length < 10) {
+            spawnTargetBehind();
+          }
+          
+          setTimeout(gameTimer, 1000);
+        }
+
+        function spawnTarget() {
+          const geometry = new THREE.SphereGeometry(0.3, 16, 12);
+          const material = new THREE.MeshLambertMaterial({ 
+            color: 0xff1a1a,
+            emissive: 0x330000 // Slight red glow
+          });
+          const target = new THREE.Mesh(geometry, material);
+          target.castShadow = true;
+          
+          // 360-degree random position around player
+          const angle = Math.random() * Math.PI * 2; // Full 360 degrees
+          const distance = 4 + Math.random() * 8; // 4-12 units away
+          const height = 0.5 + Math.random() * 4; // 0.5-4.5 units high
+          
+          // Get player position to spawn relative to player
+          const playerPos = vrMovement.playerGroup.position;
+          
+          target.position.set(
+            playerPos.x + Math.sin(angle) * distance,
+            height,
+            playerPos.z + Math.cos(angle) * distance
+          );
+          
+          // Add glowing effect for better visibility
+          const glowGeometry = new THREE.SphereGeometry(0.35, 8, 6);
+          const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff3333,
+            transparent: true,
+            opacity: 0.3
+          });
+          const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+          target.add(glow);
+          
+          targets.add(target);
+          console.log('Target spawned at:', target.position);
+          
+          // Auto-remove after 8 seconds
+          setTimeout(() => {
+            if (target.parent) {
+              targets.remove(target);
+              updateUI();
+              updateVRUI();
+            }
+          }, 8000);
+        }
+
+        // VR Movement update function
+        function updateVRMovement() {
+          if (!renderer.xr.isPresenting) return;
+          
+          const session = renderer.xr.getSession();
+          if (!session || !session.inputSources) return;
+          
+          // Process each input source (controller)
+          for (const inputSource of session.inputSources) {
+            if (inputSource.gamepad) {
+              const gamepad = inputSource.gamepad;
+              
+              // Left controller - movement (usually left hand)
+              if (inputSource.handedness === 'left') {
+                // Thumbstick movement (axes 2,3 for thumbstick)
+                if (gamepad.axes && gamepad.axes.length >= 4) {
+                  const moveX = gamepad.axes[2]; // Thumbstick X
+                  const moveZ = gamepad.axes[3]; // Thumbstick Y
+                  
+                  if (Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1) {
+                    // Calculate movement direction
+                    const direction = new THREE.Vector3();
+                    const cameraDirection = new THREE.Vector3();
+                    
+                    // Get camera forward direction
+                    camera.getWorldDirection(cameraDirection);
+                    cameraDirection.y = 0; // Remove vertical component
+                    cameraDirection.normalize();
+                    
+                    // Calculate right direction
+                    const rightDirection = new THREE.Vector3();
+                    rightDirection.crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0));
+                    
+                    // Combine movements
+                    direction.addScaledVector(rightDirection, moveX * vrMovement.moveSpeed);
+                    direction.addScaledVector(cameraDirection, -moveZ * vrMovement.moveSpeed);
+                    
+                    // Apply movement to player group
+                    vrMovement.playerGroup.position.add(direction);
+                  }
+                }
+              }
+              
+              // Right controller - snap turning (usually right hand)
+              if (inputSource.handedness === 'right') {
+                if (gamepad.axes && gamepad.axes.length >= 4) {
+                  const turnX = gamepad.axes[2]; // Right thumbstick X
+                  
+                  if (Math.abs(turnX) > 0.7) { // Snap turn threshold
+                    // Snap turn in 30-degree increments
+                    const turnAmount = turnX > 0 ? Math.PI / 6 : -Math.PI / 6; // 30 degrees
+                    vrMovement.playerGroup.rotateY(turnAmount);
+                    
+                    // Prevent continuous turning by adding a small delay
+                    setTimeout(() => {}, 200);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        function updateUI() {
+          document.getElementById('score').textContent = gameState.score;
+          document.getElementById('timer').textContent = gameState.timeLeft;
+        }
+
+        // Resize handler
+        function onWindowResize() {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener('resize', onWindowResize);
+
+        // Animation loop (WebXR compatible)
+        function animate() {
+          updateVRMovement(); // Handle VR thumbstick movement
+          renderer.render(scene, camera);
+        }
+
+        // Start everything
+        console.log('Starting WebXR animation loop...');
+        renderer.setAnimationLoop(animate);
+        updateUI();
+        updateVRUI();
+        document.getElementById('status').textContent = 'Ready! Click to start game or Enter VR';
+        
+        // Test render
+        console.log('Renderer info:', renderer.info);
+        
+      } catch (error) {
+        console.error('Error initializing game:', error);
+        document.getElementById('status').textContent = 'Error: ' + error.message;
+      }
+    }
+  </script>
+</body>
+</html>
